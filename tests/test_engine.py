@@ -10,6 +10,15 @@ from deviation_risk_generator.engine import DeviationRiskEngine
 from deviation_risk_generator.knowledge_base import load_knowledge_base
 
 
+def _create_csv_plan(tmp_path: Path, batch_date: date, product: str, room_class: str) -> Path:
+    plan_path = tmp_path / "plan.csv"
+    plan_path.write_text(
+        f"date,product,room_class\n{batch_date.isoformat()},{product},{room_class}\n",
+        encoding="utf-8",
+    )
+    return plan_path
+
+
 def _create_kb(tmp_path: Path) -> Path:
     kb = {
         "sops": {
@@ -75,3 +84,35 @@ def test_skips_deviation_when_within_window(tmp_path: Path) -> None:
 
     assert result.start_deviation is False
     assert "within accepted window" in result.reason
+
+
+def test_handles_real_world_sensor_and_product_variants(tmp_path: Path) -> None:
+    kb_path = _create_kb(tmp_path)
+    plan_path = _create_plan(tmp_path, date(2026, 9, 23), "Product-A", "C")
+
+    engine = DeviationRiskEngine(load_knowledge_base(kb_path))
+    result = engine.evaluate(
+        sensor_number="bms101",
+        trend_image_path="sensor_bms101_20260923_1330.png",
+        product_name=" product a ",
+        production_plan_xlsx=str(plan_path),
+    )
+
+    assert result.start_deviation is True
+    assert result.room == "Granulation-01"
+    assert result.criticality == "High"
+
+
+def test_reads_csv_production_plan(tmp_path: Path) -> None:
+    kb_path = _create_kb(tmp_path)
+    plan_path = _create_csv_plan(tmp_path, date(2026, 9, 23), "Product-A", "C")
+
+    engine = DeviationRiskEngine(load_knowledge_base(kb_path))
+    result = engine.evaluate(
+        sensor_number="BMS-101",
+        trend_image_path="trend_20260923_1330.png",
+        product_name="Product-A",
+        production_plan_xlsx=str(plan_path),
+    )
+
+    assert result.start_deviation is True

@@ -1,0 +1,23 @@
+{
+  "sops": {
+    "risk_assessment": "QMS-SOP-RA-001",
+    "deviation": "QMS-SOP-DEV-003"
+  },
+  "layouts": {
+    "sensors": {
+      "BMS-101": {"location": "Granulation-01", "room_class": "C"},
+      "BMS-102": {"location": "Granulation-02", "room_class": "C"},
+      "BMS-201": {"location": "Blending-01", "room_class": "B"}
+    },
+    "room_time_windows": {
+      "Granulation-01": [["08:00", "12:00"]],
+      "Granulation-02": [["08:00", "12:00"]],
+      "Blending-01": [["09:00", "13:00"]]
+    }
+  },
+  "products": {
+    "Product-A": {"criticality": "High"},
+    "Product-B": {"criticality": "Medium"},
+    "Product-C": {"criticality": "Low"}
+  }
+}

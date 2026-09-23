@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time
+import re
 
 from .gmail import build_gmail_draft_payload
 from .knowledge_base import KnowledgeBase
 from .production_plan import load_planned_batches
 from .trend import extract_trend_time
+
+
+def _normalize_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value).strip().lower())
 
 
 @dataclass(frozen=True)
@@ -42,15 +47,16 @@ class DeviationRiskEngine:
 
         production_day = trend_time.date()
         planned_batches = load_planned_batches(production_plan_xlsx)
+        normalized_product_name = _normalize_key(product_name)
         production_active = any(
             batch.date == production_day
-            and batch.product.lower() == product_name.lower()
-            and batch.room_class.lower() == room_class.lower()
+            and _normalize_key(batch.product) == normalized_product_name
+            and _normalize_key(batch.room_class) == _normalize_key(room_class)
             for batch in planned_batches
         )
 
         time_accepted = self._is_time_accepted(room, trend_time.time())
-        product_rule = self.kb.products.get(product_name, {})
+        product_rule = self._get_product_rule(product_name)
         criticality = str(product_rule.get("criticality", "Medium"))
 
         if not production_active:
@@ -91,9 +97,19 @@ class DeviationRiskEngine:
 
     def _get_sensor_meta(self, sensor_number: str) -> dict:
         sensors = self.kb.layouts.get("sensors", {})
-        if sensor_number not in sensors:
-            raise KeyError(f"Sensor '{sensor_number}' not found in layout knowledge base")
-        return sensors[sensor_number]
+        normalized_target = _normalize_key(sensor_number)
+        for sensor_key, sensor_meta in sensors.items():
+            if _normalize_key(sensor_key) == normalized_target:
+                return sensor_meta
+        raise KeyError(f"Sensor '{sensor_number}' not found in layout knowledge base")
+
+    def _get_product_rule(self, product_name: str) -> dict:
+        products = self.kb.products
+        normalized_target = _normalize_key(product_name)
+        for product_key, product_meta in products.items():
+            if _normalize_key(product_key) == normalized_target:
+                return product_meta
+        return {}
 
     def _is_time_accepted(self, room: str, sensed_time: time) -> bool:
         windows = self.kb.layouts.get("room_time_windows", {}).get(room, [])
