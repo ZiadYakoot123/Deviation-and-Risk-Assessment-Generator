@@ -1,3 +1,13 @@
+Metadata-Version: 2.4
+Name: deviation-risk-assessment-generator
+Version: 0.1.0
+Summary: Simple GAMP5/URS-aligned deviation and risk assessment generator
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: openpyxl>=3.1.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+
 # Deviation-and-Risk-Assessment-Generator
 
 Simple Python project for pharmaceutical deviation decision support aligned with **GAMP5** and **URS** expectations.

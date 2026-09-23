@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+src/deviation_risk_assessment_generator.egg-info/PKG-INFO
+src/deviation_risk_assessment_generator.egg-info/SOURCES.txt
+src/deviation_risk_assessment_generator.egg-info/dependency_links.txt
+src/deviation_risk_assessment_generator.egg-info/entry_points.txt
+src/deviation_risk_assessment_generator.egg-info/requires.txt
+src/deviation_risk_assessment_generator.egg-info/top_level.txt
+src/deviation_risk_generator/__init__.py
+src/deviation_risk_generator/cli.py
+src/deviation_risk_generator/engine.py
+src/deviation_risk_generator/gmail.py
+src/deviation_risk_generator/knowledge_base.py
+src/deviation_risk_generator/production_plan.py
+src/deviation_risk_generator/trend.py
+tests/test_engine.py
