@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from math import isfinite
 import re
+from uuid import uuid4
 
 from .gmail import build_gmail_draft_payload
 from .knowledge_base import KnowledgeBase
@@ -16,6 +18,7 @@ def _normalize_key(value: str) -> str:
 
 @dataclass(frozen=True)
 class DeviationDecision:
+    assessment_id: str
     start_deviation: bool
     reason: str
     room: str
@@ -24,6 +27,8 @@ class DeviationDecision:
     risk_assessment: str
     deviation_summary: str
     qa_mail_draft: dict
+    alarm_value: float | None = None
+    alarm_trend: str | None = None
 
 
 class DeviationRiskEngine:
@@ -39,7 +44,12 @@ class DeviationRiskEngine:
         trend_image_path: str,
         product_name: str,
         production_plan_xlsx: str,
+        alarm_value: float | None = None,
+        alarm_trend: str | None = None,
+        assessment_id: str | None = None,
     ) -> DeviationDecision:
+        if alarm_value is not None and not isfinite(alarm_value):
+            raise ValueError("Alarm value must be finite")
         trend_time = extract_trend_time(trend_image_path)
         sensor_meta = self._get_sensor_meta(sensor_number)
         room = sensor_meta["location"]
@@ -82,9 +92,21 @@ class DeviationRiskEngine:
             reason=reason,
         )
         subject = f"Deviation Assessment - {product_name} - {criticality}"
-        body = f"Deviation summary:\n{deviation_summary}\n\nRisk assessment:\n{risk_assessment}"
+        assessment_id = assessment_id or str(uuid4())
+        alarm_context = (
+            f"\nAlarm value: {alarm_value}"
+            f"\nAlarm trend: {alarm_trend}"
+            if alarm_value is not None or alarm_trend is not None
+            else ""
+        )
+        body = (
+            f"Assessment ID: {assessment_id}\n"
+            f"Deviation summary:\n{deviation_summary}\n"
+            f"{alarm_context}\n\nRisk assessment:\n{risk_assessment}"
+        )
 
         return DeviationDecision(
+            assessment_id=assessment_id,
             start_deviation=start_deviation,
             reason=reason,
             room=room,
@@ -93,6 +115,8 @@ class DeviationRiskEngine:
             risk_assessment=risk_assessment,
             deviation_summary=deviation_summary,
             qa_mail_draft=build_gmail_draft_payload(self.qa_email, subject, body),
+            alarm_value=alarm_value,
+            alarm_trend=alarm_trend,
         )
 
     def _get_sensor_meta(self, sensor_number: str) -> dict:
@@ -119,7 +143,12 @@ class DeviationRiskEngine:
         for start_raw, end_raw in windows:
             start = datetime.strptime(start_raw, "%H:%M").time()
             end = datetime.strptime(end_raw, "%H:%M").time()
-            if start <= sensed_time <= end:
+            accepted = (
+                start <= sensed_time <= end
+                if start <= end
+                else sensed_time >= start or sensed_time <= end
+            )
+            if accepted:
                 return True
         return False
 

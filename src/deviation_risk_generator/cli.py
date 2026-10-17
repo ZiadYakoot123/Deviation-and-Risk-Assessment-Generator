@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .cdc import configure_logging
 from .engine import DeviationRiskEngine
 from .knowledge_base import load_knowledge_base
 
@@ -29,8 +30,10 @@ def main() -> None:
     parser.add_argument("--trend-image", help="Trend image path including YYYYMMDD_HHMM. If omitted, you will be prompted.")
     parser.add_argument("--product", default="Product-A", help="Product name from production plan. Defaults to the bundled sample product.")
     parser.add_argument("--qa-email", default="qa@company.com", help="QA email for Gmail draft payload")
+    parser.add_argument("--log-file", default="bms_assessment_audit.log", help="Audit log path")
     args = parser.parse_args()
 
+    configure_logging(args.log_file)
     sensor_number = args.sensor or _prompt_for_value("Enter BMS sensor number")
     trend_image = args.trend_image or _prompt_for_value("Enter trend image path or filename", "trend_20260923_1330.png")
 

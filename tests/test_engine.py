@@ -116,3 +116,22 @@ def test_reads_csv_production_plan(tmp_path: Path) -> None:
     )
 
     assert result.start_deviation is True
+
+
+def test_accepts_overnight_room_window(tmp_path: Path) -> None:
+    kb_path = _create_kb(tmp_path)
+    kb = json.loads(kb_path.read_text(encoding="utf-8"))
+    kb["layouts"]["room_time_windows"]["Granulation-01"] = [["22:00", "06:00"]]
+    kb_path.write_text(json.dumps(kb), encoding="utf-8")
+    plan_path = _create_plan(tmp_path, date(2026, 9, 23), "Product-A", "C")
+
+    engine = DeviationRiskEngine(load_knowledge_base(kb_path))
+    result = engine.evaluate(
+        sensor_number="BMS-101",
+        trend_image_path="trend_20260923_2330.png",
+        product_name="Product-A",
+        production_plan_xlsx=str(plan_path),
+    )
+
+    assert result.start_deviation is False
+    assert "within accepted window" in result.reason

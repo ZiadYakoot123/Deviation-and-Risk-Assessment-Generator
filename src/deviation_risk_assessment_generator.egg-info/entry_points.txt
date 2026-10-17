@@ -1,2 +1,0 @@
-[console_scripts]
-deviation-risk-generator = deviation_risk_generator.cli:main

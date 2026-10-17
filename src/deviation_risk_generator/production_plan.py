@@ -22,21 +22,25 @@ def load_planned_batches(xlsx_path: str | Path) -> list[PlannedBatch]:
     if suffix == ".csv":
         with path.open("r", encoding="utf-8", newline="") as csv_file:
             reader = csv.DictReader(csv_file)
+            headers = {
+                (header or "").strip().lower(): header
+                for header in reader.fieldnames or []
+            }
             required = {"date", "product", "room_class"}
-            if not required.issubset(set((header or "").strip().lower() for header in reader.fieldnames or [])):
+            if not required.issubset(headers):
                 raise ValueError("Production plan must include headers: date, product, room_class")
 
             batches: list[PlannedBatch] = []
             for row in reader:
                 if not row or not any((value or "").strip() for value in row.values()):
                     continue
-                raw_date = (row.get("date") or row.get("Date") or "").strip()
+                raw_date = (row.get(headers["date"]) or "").strip()
                 batch_date = date.fromisoformat(raw_date)
                 batches.append(
                     PlannedBatch(
                         date=batch_date,
-                        product=str(row.get("product") or row.get("Product") or "").strip(),
-                        room_class=str(row.get("room_class") or row.get("Room_Class") or "").strip(),
+                        product=str(row.get(headers["product"]) or "").strip(),
+                        room_class=str(row.get(headers["room_class"]) or "").strip(),
                     )
                 )
             return batches
@@ -52,10 +56,12 @@ def load_planned_batches(xlsx_path: str | Path) -> list[PlannedBatch]:
     idx = {name: headers.index(name) for name in required}
     batches: list[PlannedBatch] = []
 
-    for row in sheet.iter_rows(min_row=2, values_only=True):
+    for row_number, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
         if not any(row):
             continue
         raw_date = row[idx["date"]]
+        if raw_date is None:
+            raise ValueError(f"Production plan row {row_number} is missing a date")
         if hasattr(raw_date, "date"):
             batch_date = raw_date.date()
         else:
