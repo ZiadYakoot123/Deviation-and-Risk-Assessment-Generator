@@ -29,6 +29,10 @@ class DeviationDecision:
     qa_mail_draft: dict
     alarm_value: float | None = None
     alarm_trend: str | None = None
+    parameter: str | None = None
+    unit: str | None = None
+    limit_status: str | None = None
+    capa_actions: dict | None = None
 
 
 class DeviationRiskEngine:
@@ -54,6 +58,10 @@ class DeviationRiskEngine:
         sensor_meta = self._get_sensor_meta(sensor_number)
         room = sensor_meta["location"]
         room_class = sensor_meta["room_class"]
+        parameter = sensor_meta.get("parameter")
+        unit = sensor_meta.get("unit")
+        limit_status = self._get_limit_status(sensor_meta, alarm_value)
+        room_controls = self._get_room_controls(room_class)
 
         production_day = trend_time.date()
         planned_batches = load_planned_batches(production_plan_xlsx)
@@ -69,7 +77,10 @@ class DeviationRiskEngine:
         product_rule = self._get_product_rule(product_name)
         criticality = str(product_rule.get("criticality", "Medium"))
 
-        if not production_active:
+        if limit_status == "out_of_limit":
+            reason = f"{parameter or 'Sensor'} value is outside approved limits."
+            start_deviation = True
+        elif not production_active:
             reason = "No matching production in daily plan; no deviation workflow required."
             start_deviation = False
         elif time_accepted:
@@ -90,12 +101,18 @@ class DeviationRiskEngine:
             criticality=criticality,
             start_deviation=start_deviation,
             reason=reason,
+            limit_status=limit_status,
+            room_controls=room_controls,
+            sensor_meta=sensor_meta,
+            product_rule=product_rule,
         )
         subject = f"Deviation Assessment - {product_name} - {criticality}"
         assessment_id = assessment_id or str(uuid4())
         alarm_context = (
             f"\nAlarm value: {alarm_value}"
             f"\nAlarm trend: {alarm_trend}"
+            f"\nParameter: {parameter} ({unit})"
+            f"\nLimit status: {limit_status}"
             if alarm_value is not None or alarm_trend is not None
             else ""
         )
@@ -117,6 +134,10 @@ class DeviationRiskEngine:
             qa_mail_draft=build_gmail_draft_payload(self.qa_email, subject, body),
             alarm_value=alarm_value,
             alarm_trend=alarm_trend,
+            parameter=parameter,
+            unit=unit,
+            limit_status=limit_status,
+            capa_actions=self._get_capa_actions(),
         )
 
     def _get_sensor_meta(self, sensor_number: str) -> dict:
@@ -134,6 +155,23 @@ class DeviationRiskEngine:
             if _normalize_key(product_key) == normalized_target:
                 return product_meta
         return {}
+
+    def _get_room_controls(self, room_class: str) -> dict:
+        return self.kb.layouts.get("room_classes", {}).get(room_class, {})
+
+    @staticmethod
+    def _get_limit_status(sensor_meta: dict, alarm_value: float | None) -> str:
+        if alarm_value is None:
+            return "not_evaluated"
+        limits = sensor_meta.get("limits")
+        if not limits:
+            return "not_configured"
+        if alarm_value < limits["min"] or alarm_value > limits["max"]:
+            return "out_of_limit"
+        return "within_limit"
+
+    def _get_capa_actions(self) -> dict:
+        return self.kb.capa_actions
 
     def _is_time_accepted(self, room: str, sensed_time: time) -> bool:
         windows = self.kb.layouts.get("room_time_windows", {}).get(room, [])
@@ -160,17 +198,33 @@ class DeviationRiskEngine:
         criticality: str,
         start_deviation: bool,
         reason: str,
+        limit_status: str,
+        room_controls: dict,
+        sensor_meta: dict,
+        product_rule: dict,
     ) -> str:
         # Lightweight deterministic response shaped as an LLM prompt output artifact.
         sop_risk = self.kb.sops.get("risk_assessment", "Use site risk SOP")
         sop_dev = self.kb.sops.get("deviation", "Use site deviation SOP")
+        sop_alarm = self.kb.sops.get("alarm_handling", "Use site alarm SOP")
+        sop_capa = self.kb.sops.get("capa", "Use site CAPA SOP")
         gamp5_note = "GAMP5-aligned: risk-based assessment with documented traceability to URS."
 
         status = "Deviation to be initiated." if start_deviation else "No deviation initiation needed."
+        limits = sensor_meta.get("limits", {})
+        pressure = room_controls.get("differential_pressure_pa", {})
+        product_factors = ", ".join(product_rule.get("risk_factors", [])) or "Not specified"
         return (
             f"{gamp5_note}\n"
             f"Product: {product_name} | Room: {room} ({room_class}) | Criticality: {criticality}\n"
             f"Decision: {status}\n"
             f"Rationale: {reason}\n"
-            f"Applicable SOPs: {sop_dev}; {sop_risk}."
+            f"Sensor limits: {limits.get('min', 'N/A')} to {limits.get('max', 'N/A')}\n"
+            f"Room differential pressure requirement: {pressure.get('min', 'N/A')} to {pressure.get('max', 'N/A')} Pa\n"
+            f"Door-open maximum: {room_controls.get('door_open_max_seconds', 'N/A')} seconds; "
+            f"interlock required: {room_controls.get('door_interlock_required', 'N/A')}\n"
+            f"Product risk factors: {product_factors}\n"
+            f"Applicable SOPs: {sop_dev}; {sop_risk}; {sop_alarm}; {sop_capa}.\n"
+            "GMP reference: Use the current approved site interpretation of applicable GMP guidance; "
+            "the values above are controlled site configuration, not universal regulatory limits."
         )

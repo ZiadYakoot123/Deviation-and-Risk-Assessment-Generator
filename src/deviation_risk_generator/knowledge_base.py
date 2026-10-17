@@ -10,6 +10,7 @@ class KnowledgeBase:
     sops: dict
     layouts: dict
     products: dict
+    capa_actions: dict
 
 
 def load_knowledge_base(path: str | Path) -> KnowledgeBase:
@@ -18,4 +19,5 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
         sops=data.get("sops", {}),
         layouts=data.get("layouts", {}),
         products=data.get("products", {}),
+        capa_actions=data.get("capa_actions", {}),
     )

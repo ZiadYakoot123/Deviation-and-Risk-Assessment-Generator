@@ -1,13 +1,96 @@
 {
   "sops": {
     "risk_assessment": "QMS-SOP-RA-001",
-    "deviation": "QMS-SOP-DEV-003"
+    "deviation": "QMS-SOP-DEV-003",
+    "alarm_handling": "QMS-SOP-BMS-ALM-002",
+    "environmental_monitoring": "QMS-SOP-ENV-004",
+    "capa": "QMS-SOP-CAPA-001",
+    "references": [
+      {
+        "id": "EU-GMP-ANNEX-1",
+        "title": "EU GMP Annex 1: Manufacture of Sterile Medicinal Products",
+        "use": "Use current approved site interpretation for cleanroom pressure, airflow, and door controls."
+      },
+      {
+        "id": "ICH-Q9",
+        "title": "ICH Q9 Quality Risk Management",
+        "use": "Use for documented, science- and risk-based assessment."
+      },
+      {
+        "id": "GAMP5",
+        "title": "GAMP 5 risk-based computerized system lifecycle guidance",
+        "use": "Use for system requirements, traceability, validation, and audit-trail controls."
+      }
+    ]
   },
   "layouts": {
+    "room_classes": {
+      "A": {
+        "differential_pressure_pa": {"min": 10, "max": 30},
+        "door_open_max_seconds": 30,
+        "door_interlock_required": true,
+        "gmp_control_note": "Critical zone; maintain qualified pressure cascade and minimize door opening."
+      },
+      "B": {
+        "differential_pressure_pa": {"min": 10, "max": 30},
+        "door_open_max_seconds": 60,
+        "door_interlock_required": true,
+        "gmp_control_note": "Background to Grade A; maintain qualified pressure cascade."
+      },
+      "C": {
+        "differential_pressure_pa": {"min": 10, "max": 25},
+        "door_open_max_seconds": 120,
+        "door_interlock_required": false,
+        "gmp_control_note": "Controlled cleanroom; maintain approved pressure cascade and access discipline."
+      },
+      "D": {
+        "differential_pressure_pa": {"min": 5, "max": 20},
+        "door_open_max_seconds": 180,
+        "door_interlock_required": false,
+        "gmp_control_note": "Controlled cleanroom; use the approved site environmental limits."
+      }
+    },
     "sensors": {
-      "BMS-101": {"location": "Granulation-01", "room_class": "C"},
-      "BMS-102": {"location": "Granulation-02", "room_class": "C"},
-      "BMS-201": {"location": "Blending-01", "room_class": "B"}
+      "BMS-101": {
+        "location": "Granulation-01",
+        "room_class": "C",
+        "parameter": "temperature",
+        "unit": "degC",
+        "limits": {"min": 18, "max": 25},
+        "alarm_actions": ["Verify local reading", "Notify Production and QA", "Assess product impact"]
+      },
+      "BMS-102": {
+        "location": "Granulation-02",
+        "room_class": "C",
+        "parameter": "relative_humidity",
+        "unit": "%",
+        "limits": {"min": 30, "max": 60},
+        "alarm_actions": ["Verify local reading", "Check material moisture sensitivity", "Notify QA"]
+      },
+      "BMS-201": {
+        "location": "Blending-01",
+        "room_class": "B",
+        "parameter": "differential_pressure",
+        "unit": "Pa",
+        "limits": {"min": 10, "max": 30},
+        "alarm_actions": ["Check adjacent room pressures", "Check doors and air-handling unit", "Notify QA"]
+      },
+      "BMS-DOOR-101": {
+        "location": "Granulation-01",
+        "room_class": "C",
+        "parameter": "door_open_seconds",
+        "unit": "seconds",
+        "limits": {"min": 0, "max": 120},
+        "alarm_actions": ["Close door", "Check access/interlock status", "Assess exposure duration"]
+      },
+      "BMS-DP-101": {
+        "location": "Granulation-01",
+        "room_class": "C",
+        "parameter": "differential_pressure",
+        "unit": "Pa",
+        "limits": {"min": 10, "max": 25},
+        "alarm_actions": ["Check adjacent room pressures", "Check doors and AHU", "Notify QA"]
+      }
     },
     "room_time_windows": {
       "Granulation-01": [["08:00", "12:00"]],
@@ -16,8 +99,37 @@
     }
   },
   "products": {
-    "Product-A": {"criticality": "High"},
-    "Product-B": {"criticality": "Medium"},
-    "Product-C": {"criticality": "Low"}
+    "Product-A": {
+      "criticality": "High",
+      "risk_factors": ["Sterile or high patient-impact product", "Temperature-sensitive"],
+      "capa_focus": ["Batch impact assessment", "HVAC and access investigation", "Effectiveness monitoring"]
+    },
+    "Product-B": {
+      "criticality": "Medium",
+      "risk_factors": ["Controlled environmental exposure"],
+      "capa_focus": ["Trend review", "Procedure and training review"]
+    },
+    "Product-C": {
+      "criticality": "Low",
+      "risk_factors": ["Lower direct patient-impact classification"],
+      "capa_focus": ["Documented rationale", "Periodic trend review"]
+    }
+  },
+  "capa_actions": {
+    "immediate": [
+      "Acknowledge alarm and record exact event time.",
+      "Verify the BMS value against a calibrated reference where required.",
+      "Place affected operation or material on QA hold when product impact is plausible."
+    ],
+    "corrective": [
+      "Investigate sensor calibration, alarm configuration, door/interlock, and HVAC causes.",
+      "Review affected batch, exposure duration, environmental trends, and approved procedures.",
+      "Restore the qualified state and document QA disposition before release."
+    ],
+    "preventive": [
+      "Trend alarms and recurring excursions by room and sensor.",
+      "Review preventive maintenance, calibration frequency, training, and alarm response instructions.",
+      "Perform CAPA effectiveness checks according to the approved CAPA procedure."
+    ]
   }
 }

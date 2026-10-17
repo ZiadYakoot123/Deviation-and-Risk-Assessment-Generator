@@ -204,3 +204,58 @@ def main() -> None:
         build_ai_agent_handler(engine, args.product, args.plan),
     )
     listener.run()
+
+
+def run_local_alarm(
+    sensor_number: str,
+    alarm_time: str,
+    value: str,
+    trend: str,
+    knowledge_base: str,
+    production_plan: str,
+    product_name: str,
+    qa_email: str = "qa@company.com",
+) -> None:
+    """Process one MySQL-shaped alarm row without connecting to MySQL."""
+    from .knowledge_base import load_knowledge_base
+
+    engine = DeviationRiskEngine(load_knowledge_base(knowledge_base), qa_email=qa_email)
+    handler = build_ai_agent_handler(engine, product_name, production_plan)
+    alarm = validate_alarm_data(
+        {
+            "sensor_number": sensor_number,
+            "time": alarm_time,
+            "value": value,
+            "trend": trend,
+        }
+    )
+
+    import json
+
+    print(json.dumps(handler(alarm).__dict__, indent=2))
+
+
+def local_main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Process one local BMS alarm without MySQL")
+    parser.add_argument("--kb", required=True, help="Path to the knowledge-base JSON")
+    parser.add_argument("--plan", required=True, help="Path to the production plan XLSX/CSV")
+    parser.add_argument("--product", required=True, help="Product name for the assessment")
+    parser.add_argument("--sensor", required=True, help="BMS sensor number")
+    parser.add_argument("--time", required=True, help="Alarm time in ISO format, e.g. 2026-09-23T13:30:00")
+    parser.add_argument("--value", required=True, help="Numeric alarm value")
+    parser.add_argument("--trend", required=True, help="Alarm trend, e.g. high or low")
+    parser.add_argument("--qa-email", default="qa@company.com")
+    args = parser.parse_args()
+
+    run_local_alarm(
+        sensor_number=args.sensor,
+        alarm_time=args.time,
+        value=args.value,
+        trend=args.trend,
+        knowledge_base=args.kb,
+        production_plan=args.plan,
+        product_name=args.product,
+        qa_email=args.qa_email,
+    )

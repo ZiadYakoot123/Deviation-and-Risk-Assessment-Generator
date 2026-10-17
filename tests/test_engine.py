@@ -24,17 +24,33 @@ def _create_kb(tmp_path: Path) -> Path:
         "sops": {
             "risk_assessment": "QMS-SOP-RA-001",
             "deviation": "QMS-SOP-DEV-003",
+            "alarm_handling": "QMS-SOP-BMS-ALM-002",
+            "capa": "QMS-SOP-CAPA-001",
         },
         "layouts": {
             "sensors": {
-                "BMS-101": {"location": "Granulation-01", "room_class": "C"},
+                "BMS-101": {
+                    "location": "Granulation-01",
+                    "room_class": "C",
+                    "parameter": "temperature",
+                    "unit": "degC",
+                    "limits": {"min": 18, "max": 25},
+                },
             },
             "room_time_windows": {
                 "Granulation-01": [["08:00", "12:00"]],
             },
         },
         "products": {
-            "Product-A": {"criticality": "High"},
+            "Product-A": {
+                "criticality": "High",
+                "risk_factors": ["Temperature-sensitive"],
+            },
+        },
+        "capa_actions": {
+            "immediate": ["Acknowledge alarm"],
+            "corrective": ["Investigate cause"],
+            "preventive": ["Trend recurring alarms"],
         },
     }
     kb_path = tmp_path / "kb.json"
@@ -135,3 +151,23 @@ def test_accepts_overnight_room_window(tmp_path: Path) -> None:
 
     assert result.start_deviation is False
     assert "within accepted window" in result.reason
+
+
+def test_includes_sensor_limits_room_controls_and_capa(tmp_path: Path) -> None:
+    kb_path = _create_kb(tmp_path)
+    plan_path = _create_plan(tmp_path, date(2026, 9, 23), "Product-A", "C")
+
+    engine = DeviationRiskEngine(load_knowledge_base(kb_path))
+    result = engine.evaluate(
+        sensor_number="BMS-101",
+        trend_image_path="trend_20260923_0930.png",
+        product_name="Product-A",
+        production_plan_xlsx=str(plan_path),
+        alarm_value=27,
+        alarm_trend="high",
+    )
+
+    assert result.start_deviation is True
+    assert result.limit_status == "out_of_limit"
+    assert result.capa_actions["corrective"] == ["Investigate cause"]
+    assert "Sensor limits: 18 to 25" in result.risk_assessment
